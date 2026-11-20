@@ -59,3 +59,41 @@ class DistributionInput(BaseModel):
     recipient:str=Field(min_length=2,max_length=100)
     seeds:int=Field(ge=1,le=10000)
     purpose:str=Field(min_length=5,max_length=300)
+class ApproveInput(BaseModel):
+    leave_date:date|None=None
+class ReturnBagInput(BaseModel):
+    bag_no:str=Field(min_length=1,max_length=40,pattern=r'\S')
+    seeds:int=Field(ge=1,le=10000)
+    sampled:int|None=Field(default=None,ge=1,le=10000)
+    germinated:int|None=Field(default=None,ge=0)
+    @model_validator(mode='after')
+    def valid(self):
+        if self.sampled is not None and self.germinated is not None and self.germinated>self.sampled:raise ValueError('发芽粒数不能超过抽样粒数')
+        if (self.sampled is None)!=(self.germinated is None):raise ValueError('抽样粒数与发芽粒数须同时填写')
+        if self.sampled is not None and self.sampled>self.seeds:raise ValueError('抽样粒数不能超过本袋粒数')
+        return self
+class ReturnInput(BaseModel):
+    distribution_id:int
+    code:str=Field(min_length=3,max_length=60)
+    return_date:date|None=None
+    bags:list[ReturnBagInput]=Field(min_length=1,max_length=50)
+    @model_validator(mode='after')
+    def valid(self):
+        nos=[b.bag_no for b in self.bags]
+        if len(nos)!=len(set(nos)):raise ValueError('同一退种单内袋号不可重复')
+        return self
+class RetestInput(BaseModel):
+    sampled:int=Field(ge=20,le=1000)
+    germinated:int=Field(ge=0)
+    @model_validator(mode='after')
+    def valid(self):
+        if self.germinated>self.sampled:raise ValueError('发芽粒数不能超过抽样粒数')
+        return self
+class AcceptInput(BaseModel):
+    sampled:int|None=Field(default=None,ge=1,le=10000)
+    germinated:int|None=Field(default=None,ge=0)
+    @model_validator(mode='after')
+    def valid(self):
+        if self.sampled is not None and self.germinated is not None and self.germinated>self.sampled:raise ValueError('发芽粒数不能超过抽样粒数')
+        if (self.sampled is None)!=(self.germinated is None):raise ValueError('抽样粒数与发芽粒数须同时填写')
+        return self

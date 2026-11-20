@@ -1,4 +1,4 @@
-from sqlalchemy import String,Integer,Float,JSON,ForeignKey,CheckConstraint
+from sqlalchemy import String,Integer,Float,Boolean,JSON,ForeignKey,CheckConstraint
 from sqlalchemy.orm import Mapped,mapped_column
 from .db import Base
 class User(Base):
@@ -91,7 +91,30 @@ class Distribution(Base):
     seeds:Mapped[int]=mapped_column(Integer)
     purpose:Mapped[str]=mapped_column(String(300))
     state:Mapped[str]=mapped_column(String(20),default='requested')
+    leave_date:Mapped[str|None]=mapped_column(String(10),nullable=True)
     reserve_snapshot:Mapped[dict|None]=mapped_column(JSON,nullable=True)
+class ReturnOrder(Base):
+    __tablename__='return_orders'
+    id:Mapped[int]=mapped_column(primary_key=True)
+    code:Mapped[str]=mapped_column(String(60),unique=True)
+    distribution_id:Mapped[int]=mapped_column(ForeignKey('distributions.id'))
+    state:Mapped[str]=mapped_column(String(20),default='pending')
+    leave_days:Mapped[int|None]=mapped_column(Integer,nullable=True)
+    retest_sampled:Mapped[int|None]=mapped_column(Integer,nullable=True)
+    retest_germinated:Mapped[int|None]=mapped_column(Integer,nullable=True)
+    prediction:Mapped[dict|None]=mapped_column(JSON,nullable=True)
+    basis:Mapped[dict|None]=mapped_column(JSON,nullable=True)
+    accepted_lot_id:Mapped[int|None]=mapped_column(ForeignKey('lots.id'),nullable=True)
+class ReturnBag(Base):
+    __tablename__='return_bags'
+    __table_args__=(CheckConstraint('seeds > 0'),)
+    id:Mapped[int]=mapped_column(primary_key=True)
+    return_order_id:Mapped[int]=mapped_column(ForeignKey('return_orders.id'))
+    bag_no:Mapped[str]=mapped_column(String(40))
+    seeds:Mapped[int]=mapped_column(Integer)
+    sampled:Mapped[int|None]=mapped_column(Integer,nullable=True)
+    germinated:Mapped[int|None]=mapped_column(Integer,nullable=True)
+    state:Mapped[str]=mapped_column(String(20),default='pending')
 class Audit(Base):
     __tablename__='audits'
     id:Mapped[int]=mapped_column(primary_key=True)

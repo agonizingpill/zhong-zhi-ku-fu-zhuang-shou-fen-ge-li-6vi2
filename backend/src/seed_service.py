@@ -21,4 +21,22 @@ def seed():
             if not s.scalar(select(Plot).where(Plot.code==code)):s.add(Plot(code=code,row=i//6,position=i%6,capacity=250))
         s.flush();lot=s.scalar(select(Lot).where(Lot.code=='QH-021-G3'))
         if not s.scalar(select(GerminationTest).where(GerminationTest.code=='GT-SEED-80')):s.add(GerminationTest(lot_id=lot.id,code='GT-SEED-80',sampled=100,germinated=80,state='recorded'))
-        s.commit();return {cls.__tablename__:s.scalar(select(func.count()).select_from(cls))for cls in (User,Accession,Lot,GerminationTest,Regeneration,Plot,Flowering,Pollination,Harvest,Distribution)}
+        # 退种演示：一条有离库日期、三次已验收历史退种（供同作物活力拟合），一条旧单缺离库日期。
+        d1=s.scalar(select(Distribution).where(Distribution.code=='DIST-DEMO-RT'))
+        if not d1:
+            d1=Distribution(lot_id=lot.id,code='DIST-DEMO-RT',recipient='青禾协作育种圃',seeds=500,purpose='协作圃小区性状观察后余种退回',state='received',leave_date='2026-06-01',reserve_snapshot={'leave_date':'2026-06-01','note':'演示历史签发快照'});s.add(d1);s.flush()
+            for i,(days,germ) in enumerate([(90,92),(120,89),(150,85)]):
+                ro=ReturnOrder(code=f'RT-DEMO-{i+1:02d}',distribution_id=d1.id,state='accepted',leave_days=days,retest_sampled=50,retest_germinated=round(50*germ/100),prediction={'decision':'pass','crop':'青豆','pass_threshold_pct':80})
+                s.add(ro);s.flush()
+                child=Lot(accession_id=lot.accession_id,code=f'RT-DEMO-{i+1:02d}-G{lot.generation}',generation=lot.generation,available=100,stored_months=round(36+days/30,3),temperature=lot.temperature,initial_rate=float(germ),parent_lot_id=lot.id)
+                s.add(child);s.flush()
+                ro.accepted_lot_id=child.id
+                ro.basis={'distribution':{},'origin_lot':{},'accepted_lot':{},'leave_days':days,'note':'演示验收依据'}
+                s.add(ReturnBag(return_order_id=ro.id,bag_no=f'D{i+1}-1',seeds=100,sampled=50,germinated=round(50*germ/100),state='accepted'))
+        d2=s.scalar(select(Distribution).where(Distribution.code=='DIST-LEGACY-RT'))
+        if not d2:
+            d2=Distribution(lot_id=lot.id,code='DIST-LEGACY-RT',recipient='老协作点',seeds=120,purpose='历史纸质单余种退回，离库日期缺失',state='received',leave_date=None,reserve_snapshot={'note':'旧单无离库日期'});s.add(d2);s.flush()
+            ro=ReturnOrder(code='RT-LEGACY-01',distribution_id=d2.id,state='isolated',leave_days=None,prediction={'decision':'missing_leave_date','decision_reason':'旧共享单缺离库日期，无法计算离库天数，隔离补测','crop':'青豆','pass_threshold_pct':80})
+            s.add(ro);s.flush()
+            s.add(ReturnBag(return_order_id=ro.id,bag_no='OLD-1',seeds=80,state='isolated'))
+        s.commit();return {cls.__tablename__:s.scalar(select(func.count()).select_from(cls))for cls in (User,Accession,Lot,GerminationTest,Regeneration,Plot,Flowering,Pollination,Harvest,Distribution,ReturnOrder,ReturnBag)}
